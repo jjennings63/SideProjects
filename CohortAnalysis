@@ -1,0 +1,50 @@
+#We use this to determine the first rental for each customer, Temporary Table 1
+drop temporary table if exists first_rental;
+create temporary table first_rental
+select
+	customer_id, 
+	min(rental_date) as first_time
+from
+	rental r
+group by 1
+;
+#Cohort Size Temporary Table 2
+Drop temporary table if exists cohort_size;
+create temporary table cohort_size
+select
+	left(first_time,7) as month,
+	count(customer_id) as num
+
+from first_rental
+
+group by 1
+;
+
+# We will find revenue per user (rpu) for each cohort, and month, Temporary Table 3
+drop temporary table if exists cohort;
+create temporary table cohort
+select
+	date_format(f.first_time, '%Y%m') as cohort_formatted,
+	date_format(r.rental_date, '%Y%m') as rental_date_formatted,
+	cs.num as cohort_size,
+	sum(p.amount) as month_revenue,
+	sum(p.amount) / cs.num as RPU
+
+from
+rental r
+	JOIN first_rental f ON r.customer_id = f.customer_id
+	JOIN cohort_size cs ON cs.month = left(f.first_time,7)
+	JOIN payment p ON r.rental_id = p.rental_id
+group by 1,2;
+
+#To make look nicer
+
+select
+	left(STR_TO_DATE(cohort_formatted, '%Y%m'),7) as 'First Rental Month',
+	period_diff(rental_date_formatted,cohort_formatted) as 'Months After Join',
+	cohort_size,
+	RPU
+from cohort
+Group By 
+	1, 2
+#Copy to clipboard, convert to excel/google spreadsheet 
